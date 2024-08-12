@@ -5,8 +5,14 @@
               xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
               xmlns:xceed="http://schemas.xceed.com/wpf/xaml/toolkit"
               xmlns:local="clr-namespace:CInstaller"
+              ResizeMode="NoResize"
+              IsTopmostButton="False"
               mc:Ignorable="d"
-              Title="MainWindow" Height="450" Width="800">
+              WindowStartupLocation="CenterScreen"
+              BorderBrush="LightGray"
+              BorderThickness="1"
+              Title="粤建智绘下载安装" 
+              Height="420" Width="660">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -17,10 +23,37 @@
                     Source="pack://application:,,,/Xceed.Wpf.Toolkit;component/Style/ButtonStyle.xaml" />
                 <ResourceDictionary
                     Source="pack://application:,,,/Xceed.Wpf.Toolkit;component/Style/ListView.xaml" />
+                <ResourceDictionary
+                    Source="pack://application:,,,/Xceed.Wpf.Toolkit;component/Style/TextBoxStyle.xaml" />
+                <ResourceDictionary
+                    Source="pack://application:,,,/Xceed.Wpf.Toolkit;component/Style/ProgressBarStyle.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
     <Grid>
-
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="32"/>
+        </Grid.RowDefinitions>
+        <Image Source="/Preview.png" Margin="10,0" Stretch="Fill"/>
+        <Grid x:Name="ProgressBarGrid" Grid.Row="1" Margin="10,3" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="36"/>
+            </Grid.ColumnDefinitions>
+            <xceed:ProgressBar x:Name="DownloadProgress" Value="0" Minimum="0" Maximum="100" CornRadius="5" Height="10" Margin="0,3,10,3"/>
+            <TextBlock x:Name="DownloadProgressTB" Grid.Column="1" Margin="2,0" Background="Transparent" IsEnabled="False" 
+                       FontWeight="Bold" Text="18%" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </Grid>
+        <Grid x:Name="LocationGrid" Grid.Row="1" Margin="10,3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="36"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="InstallPath" IsEnabled="False" Text="D:\codes\csharp\SDSyncApp" TextAlignment="Left" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button Grid.Column="1" Margin="2,0" FontFamily="Segoe MDL2 Assets" Content="&#xF12B;" Click="SelectInstallPathButtonClick"/>
+        </Grid>
+        <Button x:Name="MainButton" Grid.Row="2" Width="120" Margin="3" Content="下载安装" Click="DownloadAndInstallButtonClick"/>
     </Grid>
 </xceed:Window>
