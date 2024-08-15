@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Windows;
 using System.Linq;
+using System.Windows.Forms;
+using System.Diagnostics;
 
 namespace CInstaller
 {
@@ -25,6 +27,17 @@ namespace CInstaller
             // 获取 "Program Files" 目录
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             InstallPath.Text = Path.Combine(programFiles, _appModel.EN);
+        }
+
+        /// <summary>
+        /// 应用退出的时候打开安装的程序
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnClosed(object sender, EventArgs e)
+        {
+            var p = Path.Combine(InstallPath.Text, _appModel.StartUpApp);
+            Process.Start(p);
         }
 
         /// <summary>
@@ -61,6 +74,7 @@ namespace CInstaller
         /// <param name="e"></param>
         private void OkButtonClick(object sender, RoutedEventArgs e)
         {
+            Closed += OnClosed;
             Close();
         }
 
@@ -68,42 +82,53 @@ namespace CInstaller
         {
             using (var httpClient = new HttpClient())
             {
-                using (var response = await httpClient.GetAsync(_appModel.URL + "files.txt", HttpCompletionOption.ResponseHeadersRead))
+                try
                 {
-                    var responseText = await response.Content.ReadAsStringAsync();
-                    var files = responseText.Split('\n').Select(x => x.Trim('\r')).ToArray();
-                    if (!File.Exists(InstallPath.Text))
+                    using (var response = await httpClient.GetAsync(_appModel.URL + "files.txt", HttpCompletionOption.ResponseHeadersRead, _cancellationTokenSource.Token))
                     {
-                        Directory.CreateDirectory(InstallPath.Text);
-                    }
-                    _filesCount = files.Length;
-                    var start = 0d;
-                    var interval = 100d / _filesCount;
-                    foreach (var file in files)
-                    {
-                        var filePath = Path.Combine(InstallPath.Text, file);
-                        await DownloadFileAsync(start, _appModel.URL + file, filePath);
-                        if (_cancellationTokenSource.IsCancellationRequested)
-                            Dispatcher.Invoke(() =>
-                            {
-                                DownloadProgress.Value = 0;
-                                DownloadProgressTB.Text = $"0%";
-                            });
-                        start += interval;
-                        var ext = Path.GetExtension(filePath);
-                        if (ext == ".zip")
+                        var responseText = await response.Content.ReadAsStringAsync();
+                        var files = responseText.Split('\n').Select(x => x.Trim('\r')).ToArray();
+                        if (!File.Exists(InstallPath.Text))
                         {
-                            var zipName = Path.GetFileNameWithoutExtension(file);
-                            await ExtractZipFileAsync(filePath, Path.Combine(InstallPath.Text, zipName));
-                            File.Delete(filePath);
+                            Directory.CreateDirectory(InstallPath.Text);
                         }
+                        _filesCount = files.Length;
+                        var start = 0d;
+                        var interval = 100d / _filesCount;
+                        foreach (var file in files)
+                        {
+                            var filePath = Path.Combine(InstallPath.Text, file);
+                            await DownloadFileAsync(start, _appModel.URL + file, filePath);
+                            if (_cancellationTokenSource.IsCancellationRequested)
+                                Dispatcher.Invoke(() =>
+                                {
+                                    DownloadProgress.Value = 0;
+                                    DownloadProgressTB.Text = $"0%";
+                                });
+                            start += interval;
+                            var ext = Path.GetExtension(filePath);
+                            if (ext == ".zip")
+                            {
+                                var zipName = Path.GetFileNameWithoutExtension(file);
+                                await ExtractZipFileAsync(filePath, Path.Combine(InstallPath.Text, zipName));
+                                File.Delete(filePath);
+                            }
+                        }
+                        Dispatcher.Invoke(() =>
+                        {
+                            MainButton.Content = "完成";
+                            MainButton.Click -= DownloadAndInstallButtonClick;
+                            MainButton.Click -= CancelDownloadButtonClick;
+                            MainButton.Click += OkButtonClick;
+                        });
                     }
+                }
+                catch (TaskCanceledException)
+                {
                     Dispatcher.Invoke(() =>
                     {
-                        MainButton.Content = "完成";
-                        MainButton.Click -= DownloadAndInstallButtonClick;
-                        MainButton.Click -= CancelDownloadButtonClick;
-                        MainButton.Click += OkButtonClick;
+                        DownloadProgress.Value = 0;
+                        DownloadProgressTB.Text = $"0%";
                     });
                 }
             }
@@ -182,13 +207,20 @@ namespace CInstaller
                     {
                         // 获取解压目标文件的完整路径
                         string destinationPath = Path.Combine(extractPath, entry.FullName);
-                        var ddPath = Path.GetDirectoryName(destinationPath);
-                        if (ddPath == null) continue;
-                        // 确保文件的目标目录存在
-                        Directory.CreateDirectory(ddPath);
+                        if (entry.FullName.EndsWith("/"))
+                        {
+                            Directory.CreateDirectory(destinationPath);
+                        }
+                        else
+                        {
+                            var ddPath = Path.GetDirectoryName(destinationPath);
+                            if (ddPath == null) continue;
+                            // 确保文件的目标目录存在
+                            Directory.CreateDirectory(ddPath);
 
-                        // 提取文
-                        entry.ExtractToFile(destinationPath, overwrite: true);
+                            // 提取文件
+                            entry.ExtractToFile(destinationPath, overwrite: true);
+                        }
                     }
                 }
             });
@@ -201,6 +233,13 @@ namespace CInstaller
         /// <param name="e"></param>
         private void SelectInstallPathButtonClick(object sender, RoutedEventArgs e)
         {
+            var openFileDialog = new FolderBrowserDialog();
+
+            if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                var folderPath = openFileDialog.SelectedPath;
+                InstallPath.Text = Path.Combine(folderPath, _appModel.EN);
+            }
         }
     }
 }

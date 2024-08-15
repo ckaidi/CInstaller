@@ -36,23 +36,23 @@
             <RowDefinition Height="32"/>
             <RowDefinition Height="32"/>
         </Grid.RowDefinitions>
-        <Image Source="/Preview.png" Margin="10,0" Stretch="Fill"/>
-        <Grid x:Name="ProgressBarGrid" Grid.Row="1" Margin="10,3" Visibility="Collapsed">
+        <Image Source="/Preview.png" Margin="5,0" Stretch="Fill"/>
+        <Grid x:Name="ProgressBarGrid" Grid.Row="1" Margin="5,3" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="36"/>
             </Grid.ColumnDefinitions>
             <xceed:ProgressBar x:Name="DownloadProgress" Value="0" Minimum="0" Maximum="100" CornRadius="5" Height="10" Margin="0,3,10,3"/>
             <TextBlock x:Name="DownloadProgressTB" Grid.Column="1" Margin="2,0" Background="Transparent" IsEnabled="False" 
-                       FontWeight="Bold" Text="18%" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                       FontWeight="Bold" Text="0%" VerticalAlignment="Center" HorizontalAlignment="Center"/>
         </Grid>
-        <Grid x:Name="LocationGrid" Grid.Row="1" Margin="10,3">
+        <Grid x:Name="LocationGrid" Grid.Row="1" Margin="5,3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="36"/>
+                <ColumnDefinition Width="90"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="InstallPath" IsEnabled="False" Text="D:\codes\csharp\SDSyncApp" TextAlignment="Left" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <Button Grid.Column="1" Margin="2,0" FontFamily="Segoe MDL2 Assets" Content="&#xF12B;" Click="SelectInstallPathButtonClick"/>
+            <TextBox Grid.Column="0" x:Name="InstallPath" IsEnabled="False" Text="D:\codes\csharp\SDSyncApp" TextAlignment="Left" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button Grid.Column="1" Margin="2,0"  Content="修改安装路径" Click="SelectInstallPathButtonClick"/>
         </Grid>
         <Button x:Name="MainButton" Grid.Row="2" Width="120" Margin="3" Content="下载安装" Click="DownloadAndInstallButtonClick"/>
     </Grid>
