@@ -148,9 +148,7 @@ namespace CInstaller
                 using (var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, _cancellationTokenSource.Token))
                 {
                     response.EnsureSuccessStatusCode();
-
                     var totalBytes = response.Content.Headers.ContentLength ?? 0L;
-
                     using (var contentStream = await response.Content.ReadAsStreamAsync())
                     {
                         using (var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
@@ -158,7 +156,6 @@ namespace CInstaller
                             var totalRead = 0L;
                             var buffer = new byte[8192];
                             var isMoreToRead = true;
-
                             do
                             {
                                 var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
