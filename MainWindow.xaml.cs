@@ -9,6 +9,11 @@ using System.Windows;
 using System.Linq;
 using System.Windows.Forms;
 using System.Diagnostics;
+using Microsoft.Win32;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using CheckBox = Xceed.Wpf.Toolkit.CheckBox;
+using Application = System.Windows.Application;
 
 namespace CInstaller
 {
@@ -27,6 +32,22 @@ namespace CInstaller
             // 获取 "Program Files" 目录
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             InstallPath.Text = Path.Combine(programFiles, _appModel.EN);
+            Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            var revits = GetInstalledRevitVersions().Where(x =>
+            {
+                string pattern = @"Autodesk Revit (\d{4})";
+                Match match = Regex.Match(x, pattern);
+                return match.Success && int.TryParse(match.Groups[1].Value, out var year) && year >= 2020;
+            }).ToList();
+            if (revits.Count == 0)
+            {
+                Xceed.Wpf.Toolkit.MessageBox.Show(this, "电脑中没有安装任何大于2020的Autodesk Revit,安装程序退出");
+                Close();
+            }
         }
 
         /// <summary>
@@ -45,16 +66,152 @@ namespace CInstaller
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void DownloadAndInstallButtonClick(object sender, RoutedEventArgs e)
+        private void DownloadAndInstallButtonClick(object sender, RoutedEventArgs e)
         {
-            MainButton.Content = "取消";
-            MainButton.Click -= DownloadAndInstallButtonClick;
-            MainButton.Click += CancelDownloadButtonClick;
-            _cancellationTokenSource = new CancellationTokenSource();
+            var zipFile = Properties.Resources.ResourceManager.GetObject("app");
+            var installPaths = GetRevitInstallationPath();
+            foreach (var item in installPaths)
+            {
+                var addinFolder = Directory.CreateDirectory(item);
+                foreach (var version in addinFolder.GetDirectories())
+                {
+                    if (int.TryParse(version.Name, out var versionNumber) && versionNumber >= 2020)
+                    {
+                        ExtractZipFromResources(version.FullName);
+                    }
+                }
+            }
+            Xceed.Wpf.Toolkit.MessageBox.Show(this, "安装完成!");
+            Close();
 
-            ProgressBarGrid.Visibility = Visibility.Visible;
-            LocationGrid.Visibility = Visibility.Collapsed;
-            await DownloadFilelist();
+
+            //MainButton.Content = "取消";
+            //MainButton.Click -= DownloadAndInstallButtonClick;
+            //MainButton.Click += CancelDownloadButtonClick;
+            //_cancellationTokenSource = new CancellationTokenSource();
+
+            //ProgressBarGrid.Visibility = Visibility.Visible;
+            //LocationGrid.Visibility = Visibility.Collapsed;
+            //await DownloadFilelist();
+        }
+
+        public void ExtractZipFromResources(string outputDirectory)
+        {
+            try
+            {
+                // 确保输出目录存在
+                Directory.CreateDirectory(outputDirectory);
+                // 从程序集资源中获取 ZIP 文件的流
+                var resourceStream = Properties.Resources.ResourceManager.GetObject("app");
+                if (resourceStream is byte[] bs)
+                {
+                    using (MemoryStream memoryStream = new MemoryStream(bs))
+                    {
+                        if (resourceStream != null)
+                        {
+                            using (var zipArchive = new ZipArchive(memoryStream))
+                            {
+                                var count = zipArchive.Entries.Count;
+                                var inter = 100d / count;
+                                // 遍历 ZIP 文件中的所有条目并解压
+                                foreach (ZipArchiveEntry entry in zipArchive.Entries)
+                                {
+                                    string destinationPath = Path.Combine(outputDirectory, entry.FullName);
+
+                                    // 如果条目是目录，则创建目录
+                                    if (entry.FullName.EndsWith("/"))
+                                    {
+                                        Directory.CreateDirectory(destinationPath);
+                                    }
+                                    else
+                                    {
+                                        // 确保文件的目标目录存在
+                                        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                                        // 解压文件到目标路径
+                                        entry.ExtractToFile(destinationPath, overwrite: true);
+                                    }
+                                    Dispatcher.Invoke(() =>
+                                    {
+                                        MainProgressBar.Value += inter;
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (IOException ex)
+            {
+                Xceed.Wpf.Toolkit.MessageBox.Show(this, $"Error extracting resource zip: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 获取revit的安装位置
+        /// </summary>
+        /// <returns></returns>
+        public static List<string> GetRevitInstallationPath()
+        {
+            // 指定 Revit 的注册表键路径
+            string registryKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
+            // 打开注册表项
+            RegistryKey key = Registry.LocalMachine.OpenSubKey(registryKeyPath);
+            var result = new List<string>();
+            if (key != null)
+            {
+                // 遍历 "Uninstall" 下所有子键
+                foreach (string subkeyName in key.GetSubKeyNames())
+                {
+                    RegistryKey subkey = key.OpenSubKey(subkeyName);
+
+                    // 检查子键的显示名称是否包含 "Autodesk Revit"
+                    if (subkey.GetValue("DisplayName") != null &&
+                        subkey.GetValue("DisplayName").ToString().Contains("Autodesk Revit"))
+                    {
+                        // 获取并返回安装路径
+                        if (subkey.GetValue("InstallLocation") != null)
+                        {
+                            var v = subkey.GetValue("InstallLocation").ToString();
+                            if (v.Contains("Addins"))
+                                result.Add(v);
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 获取电脑上安装的revit版本
+        /// </summary>
+        /// <returns></returns>
+        public static List<string> GetInstalledRevitVersions()
+        {
+            List<string> installedVersions = new List<string>();
+            string uninstallKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
+            using (RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+            {
+                // 查询 Uninstall 键以查找 Revit 的版本
+                using (RegistryKey uninstallKey = baseKey.OpenSubKey(uninstallKeyPath))
+                {
+                    foreach (string subKeyName in uninstallKey.GetSubKeyNames())
+                    {
+                        using (RegistryKey subKey = uninstallKey.OpenSubKey(subKeyName))
+                        {
+                            if (subKey.GetValue("DisplayName") is string displayName && displayName.Contains("Autodesk Revit"))
+                            {
+                                string pattern = @"Autodesk Revit \d{4}";
+                                if (displayName.Length == "Autodesk Revit 2020".Length && Regex.Match(displayName, pattern).Success)
+                                    installedVersions.Add(displayName);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return installedVersions;
         }
 
         private void CancelDownloadButtonClick(object sender, RoutedEventArgs e)
