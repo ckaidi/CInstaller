@@ -68,16 +68,22 @@ namespace CInstaller
         /// <param name="e"></param>
         private void DownloadAndInstallButtonClick(object sender, RoutedEventArgs e)
         {
-            var zipFile = Properties.Resources.ResourceManager.GetObject("app");
             var installPaths = GetRevitInstallationPath();
-            foreach (var item in installPaths)
+            if (installPaths.Count == 0)
             {
-                var addinFolder = Directory.CreateDirectory(item);
-                foreach (var version in addinFolder.GetDirectories())
+                ExtractZipFromResources("C:\\ProgramData\\Autodesk\\Revit\\Addins\\2020");
+            }
+            else
+            {
+                foreach (var item in installPaths)
                 {
-                    if (int.TryParse(version.Name, out var versionNumber) && versionNumber >= 2020)
+                    var addinFolder = Directory.CreateDirectory(item);
+                    foreach (var version in addinFolder.GetDirectories())
                     {
-                        ExtractZipFromResources(version.FullName);
+                        if (int.TryParse(version.Name, out var versionNumber) && versionNumber >= 2020)
+                        {
+                            ExtractZipFromResources(version.FullName);
+                        }
                     }
                 }
             }
@@ -140,9 +146,9 @@ namespace CInstaller
                     }
                 }
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
-                Xceed.Wpf.Toolkit.MessageBox.Show(this, $"Error extracting resource zip: {ex.Message}");
+                Xceed.Wpf.Toolkit.MessageBox.Show(this, $"Error extracting resource zip: {ex.Message} {ex.StackTrace}");
             }
         }
 

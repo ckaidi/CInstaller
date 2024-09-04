@@ -10,6 +10,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CUpdater", "..\CUpdater\CUpdater.csproj", "{1F2CB8EE-70C5-4C7C-BCA1-9D68223BFB5C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CupdateInfoGenerater", "..\CUpdater\CupdateInfoGenerater\CupdateInfoGenerater.csproj", "{FAF919FB-A43B-483E-98A2-DD18B89FB95D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1F2CB8EE-70C5-4C7C-BCA1-9D68223BFB5C} = {1F2CB8EE-70C5-4C7C-BCA1-9D68223BFB5C}
+		{72E0FE0F-8A76-4F21-A067-D90B95AAF641} = {72E0FE0F-8A76-4F21-A067-D90B95AAF641}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
