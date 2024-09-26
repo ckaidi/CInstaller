@@ -34,6 +34,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
             <RowDefinition Height="32"/>
         </Grid.RowDefinitions>
         <Image Source="/Preview.png" Margin="5,0" Stretch="Fill"/>
@@ -46,7 +47,7 @@
             <TextBlock x:Name="DownloadProgressTB" Grid.Column="1" Margin="2,0" Background="Transparent" IsEnabled="False" 
                        FontWeight="Bold" Text="0%" VerticalAlignment="Center" HorizontalAlignment="Center"/>
         </Grid>
-        <Grid x:Name="LocationGrid" Grid.Row="1" Margin="5,3" Visibility="Collapsed">
+        <Grid x:Name="LocationGrid" Grid.Row="1" Margin="5,3" Visibility="Visible">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="90"/>
@@ -54,7 +55,7 @@
             <TextBox Grid.Column="0" x:Name="InstallPath" IsEnabled="False" Text="D:\codes\csharp\SDSyncApp" TextAlignment="Left" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <Button Grid.Column="1" Margin="2,0"  Content="修改安装路径" Click="SelectInstallPathButtonClick"/>
         </Grid>
-        <xceed:ProgressBar Grid.Row="1" Height="6" x:Name="MainProgressBar"/>
-        <Button x:Name="MainButton" Grid.Row="2" Width="120" Margin="3" Content="下载安装" Click="DownloadAndInstallButtonClick"/>
+        <xceed:ProgressBar Grid.Row="2" Height="6" x:Name="MainProgressBar"/>
+        <Button x:Name="MainButton" Grid.Row="3" Width="120" Margin="3" Content="下载安装" Click="DownloadAndInstallButtonClick"/>
     </Grid>
 </xceed:Window>

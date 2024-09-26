@@ -14,6 +14,8 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using CheckBox = Xceed.Wpf.Toolkit.CheckBox;
 using Application = System.Windows.Application;
+using System.Collections;
+using System.Runtime.Remoting.Contexts;
 
 namespace CInstaller
 {
@@ -68,37 +70,12 @@ namespace CInstaller
         /// <param name="e"></param>
         private void DownloadAndInstallButtonClick(object sender, RoutedEventArgs e)
         {
-            var installPaths = GetRevitInstallationPath();
-            if (installPaths.Count == 0)
+            if (Directory.Exists(InstallPath.Text))
             {
-                ExtractZipFromResources("C:\\ProgramData\\Autodesk\\Revit\\Addins\\2020");
+                var folder = Directory.CreateDirectory(InstallPath.Text);
             }
-            else
-            {
-                foreach (var item in installPaths)
-                {
-                    var addinFolder = Directory.CreateDirectory(item);
-                    foreach (var version in addinFolder.GetDirectories())
-                    {
-                        if (int.TryParse(version.Name, out var versionNumber) && versionNumber >= 2020)
-                        {
-                            ExtractZipFromResources(version.FullName);
-                        }
-                    }
-                }
-            }
-            Xceed.Wpf.Toolkit.MessageBox.Show(this, "安装完成!");
-            Close();
-
-
-            //MainButton.Content = "取消";
-            //MainButton.Click -= DownloadAndInstallButtonClick;
-            //MainButton.Click += CancelDownloadButtonClick;
-            //_cancellationTokenSource = new CancellationTokenSource();
-
-            //ProgressBarGrid.Visibility = Visibility.Visible;
-            //LocationGrid.Visibility = Visibility.Collapsed;
-            //await DownloadFilelist();
+            ExtractZipFromResources(InstallPath.Text);
+            OnAfterInstall();
         }
 
         public void ExtractZipFromResources(string outputDirectory)
@@ -399,6 +376,148 @@ namespace CInstaller
             {
                 var folderPath = openFileDialog.SelectedPath;
                 InstallPath.Text = Path.Combine(folderPath, _appModel.EN);
+            }
+        }
+
+        protected void OnAfterInstall()
+        {
+            // 设置环境变量
+            Environment.SetEnvironmentVariable("SDSyncApp", InstallPath.Text, EnvironmentVariableTarget.User);
+            string picturesFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            picturesFolder = Path.Combine(picturesFolder, "SDSyncApp");
+            if (!Directory.Exists(picturesFolder))
+                Directory.CreateDirectory(picturesFolder);
+            Environment.SetEnvironmentVariable("SDSyncAppImg", picturesFolder, EnvironmentVariableTarget.User);
+            TryInstallRevit();
+            TryInstallCad();
+            TryInstallRhino();
+        }
+
+        private void TryInstallRevit()
+        {
+            try
+            {
+                var installPath = Path.GetDirectoryName(GetType().Assembly.Location);
+                var revitPluginPath = Path.Combine(Path.Combine(installPath, "plugins"), "Revit");
+                var plugFolder = Directory.CreateDirectory(revitPluginPath);
+                for (int i = 2015; i <= DateTime.Now.Year + 1; i++)
+                {
+                    var path = $"C:\\ProgramData\\Autodesk\\Revit\\Addins\\{i}";
+                    if (!Directory.Exists(path))
+                        Directory.CreateDirectory(path);
+                    foreach (var file in plugFolder.GetFiles())
+                        file.CopyTo(Path.Combine(path, file.Name), true);
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        private void TryInstallCad()
+        {
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64))
+                using (var key = hklm.OpenSubKey(@"SOFTWARE\Autodesk\AutoCAD", true))
+                {
+                    if (key != null)
+                    {
+                        string[] subKeys = key.GetSubKeyNames();
+                        foreach (string subKey in subKeys)
+                        {
+                            using (RegistryKey subKeyHandle = key.OpenSubKey(subKey, true))
+                            {
+                                if (subKeyHandle != null)
+                                {
+                                    foreach (string valueName in subKeyHandle.GetValueNames())
+                                    {
+                                        if (valueName == "CurVer")
+                                        {
+                                            object value = subKeyHandle.GetValue(valueName);
+                                            var k = subKeyHandle.OpenSubKey(value.ToString(), true);
+                                            if (k != null)
+                                            {
+                                                var arxPath = Path.Combine(InstallPath.Text, "plugins", "Cad", subKey.Substring(0, 3), "GDAD_YJZH.arx");
+                                                if (!File.Exists(arxPath)) break;
+                                                var applications = k.OpenSubKey("Applications", true);
+                                                var sdsyncKey = applications.CreateSubKey("SDSyncApp");
+                                                sdsyncKey.SetValue("LOADER", arxPath);
+                                                sdsyncKey.SetValue("LOADCTRLS", 12);
+                                                var commandKey = sdsyncKey.CreateSubKey("Commands");
+                                                commandKey.SetValue("GDADTOIMAGE", "GDADTOIMAGE");
+                                                commandKey.SetValue("GDADTOIMAGESTART", "GDADTOIMAGESTART");
+                                                sdsyncKey.CreateSubKey("Groups");
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                Debugger.Break();
+#endif
+            }
+        }
+
+        private void TryInstallRhino()
+        {
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (var key = hklm.OpenSubKey(@"SOFTWARE\McNeel\Rhinoceros", true))
+                {
+                    if (key != null)
+                    {
+                        string[] subKeys = key.GetSubKeyNames();
+                        foreach (string subKey in subKeys)
+                        {
+                            using (RegistryKey subKeyHandle = key.OpenSubKey(subKey, true))
+                            {
+                                if (subKeyHandle != null)
+                                {
+                                    var installKey = subKeyHandle.OpenSubKey("Plug-ins", true);
+                                    if (installKey != null)
+                                    {
+                                        var sdsyncKey = installKey.CreateSubKey("6646c993-5eb1-4b2f-b67b-6ae1f471cd55");
+                                        var commandList = sdsyncKey.CreateSubKey("CommandList");
+                                        commandList.SetValue("YJZHOpenSDSyncApp", "1:YJZHOpenSDSyncApp");
+                                        commandList.SetValue("YJZHExportImage", "2:YJZHExportImage");
+                                        commandList.SetValue("YJZHAbout", "3:YJZHAbout");
+                                        var pluginKey = sdsyncKey.CreateSubKey("PlugIn");
+                                        pluginKey.SetValue("FileName", Path.Combine(InstallPath.Text, "plugins", "Rhino", "SDPluginForRhino.rhp"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                Debugger.Break();
+#endif
+            }
+        }
+
+        private void TryInstallSketchup()
+        {
+            try
+            {
+
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                Debugger.Break();
+#endif
             }
         }
     }
