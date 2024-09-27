@@ -16,6 +16,8 @@ using CheckBox = Xceed.Wpf.Toolkit.CheckBox;
 using Application = System.Windows.Application;
 using System.Collections;
 using System.Runtime.Remoting.Contexts;
+using Xceed.Wpf.Toolkit;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
 namespace CInstaller
 {
@@ -70,12 +72,33 @@ namespace CInstaller
         /// <param name="e"></param>
         private void DownloadAndInstallButtonClick(object sender, RoutedEventArgs e)
         {
+            /// 防止用户重复点击
+            Dispatcher.Invoke(() =>
+            {
+                MainButton.Content = "安装中";
+                MainButton.IsEnabled = false;
+            });
             if (Directory.Exists(InstallPath.Text))
             {
                 var folder = Directory.CreateDirectory(InstallPath.Text);
             }
-            ExtractZipFromResources(InstallPath.Text);
-            OnAfterInstall();
+            var text = InstallPath.Text;
+            var task = new Task(() =>
+            {
+                ExtractZipFromResources(text);
+                OnAfterInstall(text);
+                Dispatcher.Invoke(() =>
+                {
+                    MainButton.Content = "完成";
+                    MainButton.IsEnabled = true;
+                    MainButton.Click -= DownloadAndInstallButtonClick;
+                    MainButton.Click += (ss, ee) =>
+                    {
+                        Close();
+                    };
+                });
+            });
+            task.Start();
         }
 
         public void ExtractZipFromResources(string outputDirectory)
@@ -95,7 +118,7 @@ namespace CInstaller
                             using (var zipArchive = new ZipArchive(memoryStream))
                             {
                                 var count = zipArchive.Entries.Count;
-                                var inter = 100d / count;
+                                var inter = 80d / count;
                                 // 遍历 ZIP 文件中的所有条目并解压
                                 foreach (ZipArchiveEntry entry in zipArchive.Entries)
                                 {
@@ -379,27 +402,29 @@ namespace CInstaller
             }
         }
 
-        protected void OnAfterInstall()
+        protected void OnAfterInstall(string installPath)
         {
             // 设置环境变量
-            Environment.SetEnvironmentVariable("SDSyncApp", InstallPath.Text, EnvironmentVariableTarget.User);
+            Environment.SetEnvironmentVariable("SDSyncApp", installPath, EnvironmentVariableTarget.User);
             string picturesFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
             picturesFolder = Path.Combine(picturesFolder, "SDSyncApp");
             if (!Directory.Exists(picturesFolder))
                 Directory.CreateDirectory(picturesFolder);
             Environment.SetEnvironmentVariable("SDSyncAppImg", picturesFolder, EnvironmentVariableTarget.User);
-            TryInstallRevit();
-            TryInstallCad();
-            TryInstallRhino();
+            TryInstallRevit(installPath);
+            TryInstallCad(installPath);
+            TryInstallRhino(installPath);
+            TryInstallSketchup(installPath);
         }
 
-        private void TryInstallRevit()
+        private void TryInstallRevit(string installPath)
         {
             try
             {
-                var installPath = Path.GetDirectoryName(GetType().Assembly.Location);
                 var revitPluginPath = Path.Combine(Path.Combine(installPath, "plugins"), "Revit");
                 var plugFolder = Directory.CreateDirectory(revitPluginPath);
+                var count = DateTime.Now.Year - 2014d;
+                var interval = 5d / count;
                 for (int i = 2015; i <= DateTime.Now.Year + 1; i++)
                 {
                     var path = $"C:\\ProgramData\\Autodesk\\Revit\\Addins\\{i}";
@@ -407,14 +432,29 @@ namespace CInstaller
                         Directory.CreateDirectory(path);
                     foreach (var file in plugFolder.GetFiles())
                         file.CopyTo(Path.Combine(path, file.Name), true);
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        MainProgressBar.Value += interval;
+                    });
                 }
             }
             catch (Exception ex)
             {
+#if DEBUG
+                Debugger.Break();
+#endif
+            }
+            finally
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MainProgressBar.Value = 85;
+                });
             }
         }
 
-        private void TryInstallCad()
+        private void TryInstallCad(string installPath)
         {
             try
             {
@@ -424,6 +464,7 @@ namespace CInstaller
                     if (key != null)
                     {
                         string[] subKeys = key.GetSubKeyNames();
+                        var interval = 5d / subKeys.Length;
                         foreach (string subKey in subKeys)
                         {
                             using (RegistryKey subKeyHandle = key.OpenSubKey(subKey, true))
@@ -438,7 +479,7 @@ namespace CInstaller
                                             var k = subKeyHandle.OpenSubKey(value.ToString(), true);
                                             if (k != null)
                                             {
-                                                var arxPath = Path.Combine(InstallPath.Text, "plugins", "Cad", subKey.Substring(0, 3), "GDAD_YJZH.arx");
+                                                var arxPath = Path.Combine(installPath, "plugins", "Cad", subKey.Substring(0, 3), "GDAD_YJZH.arx");
                                                 if (!File.Exists(arxPath)) break;
                                                 var applications = k.OpenSubKey("Applications", true);
                                                 var sdsyncKey = applications.CreateSubKey("SDSyncApp");
@@ -454,6 +495,10 @@ namespace CInstaller
                                     }
                                 }
                             }
+                            Dispatcher.Invoke(() =>
+                            {
+                                MainProgressBar.Value += interval;
+                            });
                         }
                     }
                 }
@@ -464,9 +509,16 @@ namespace CInstaller
                 Debugger.Break();
 #endif
             }
+            finally
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MainProgressBar.Value = 90;
+                });
+            }
         }
 
-        private void TryInstallRhino()
+        private void TryInstallRhino(string installPath)
         {
             try
             {
@@ -476,6 +528,7 @@ namespace CInstaller
                     if (key != null)
                     {
                         string[] subKeys = key.GetSubKeyNames();
+                        var interval = 5d / subKeys.Length;
                         foreach (string subKey in subKeys)
                         {
                             using (RegistryKey subKeyHandle = key.OpenSubKey(subKey, true))
@@ -491,10 +544,14 @@ namespace CInstaller
                                         commandList.SetValue("YJZHExportImage", "2:YJZHExportImage");
                                         commandList.SetValue("YJZHAbout", "3:YJZHAbout");
                                         var pluginKey = sdsyncKey.CreateSubKey("PlugIn");
-                                        pluginKey.SetValue("FileName", Path.Combine(InstallPath.Text, "plugins", "Rhino", "SDPluginForRhino.rhp"));
+                                        pluginKey.SetValue("FileName", Path.Combine(installPath, "plugins", "Rhino", "SDPluginForRhino.rhp"));
                                     }
                                 }
                             }
+                            Dispatcher.Invoke(() =>
+                            {
+                                MainProgressBar.Value += interval;
+                            });
                         }
                     }
                 }
@@ -505,19 +562,48 @@ namespace CInstaller
                 Debugger.Break();
 #endif
             }
+            finally
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MainProgressBar.Value = 95;
+                });
+            }
         }
 
-        private void TryInstallSketchup()
+        private void TryInstallSketchup(string installPath)
         {
             try
             {
+                var suPluginPath = Path.Combine(installPath, "plugins", "Sketchup");
+                var plugFolder = Directory.CreateDirectory(suPluginPath);
+                var count = DateTime.Now.Year - 2014d;
+                var interval = 5d / count;
 
+                for (int i = 2015; i <= DateTime.Now.Year + 1; i++)
+                {
+                    var path = $"C:\\Users\\{Environment.UserName}\\AppData\\Roaming\\SketchUp\\SketchUp {i}\\SketchUp\\Plugins\\";
+                    if (!Directory.Exists(path))
+                        Directory.CreateDirectory(path);
+                    FolderUtils.CopyDirectory(suPluginPath, path);
+                    Dispatcher.Invoke(() =>
+                    {
+                        MainProgressBar.Value += interval;
+                    });
+                }
             }
             catch (Exception ex)
             {
 #if DEBUG
                 Debugger.Break();
 #endif
+            }
+            finally
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MainProgressBar.Value = 100;
+                });
             }
         }
     }
