@@ -12,12 +12,7 @@ using System.Diagnostics;
 using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using CheckBox = Xceed.Wpf.Toolkit.CheckBox;
-using Application = System.Windows.Application;
-using System.Collections;
-using System.Runtime.Remoting.Contexts;
 using Xceed.Wpf.Toolkit;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
 namespace CInstaller
 {
@@ -544,7 +539,7 @@ namespace CInstaller
                                         commandList.SetValue("YJZHExportImage", "2:YJZHExportImage");
                                         commandList.SetValue("YJZHAbout", "3:YJZHAbout");
                                         var pluginKey = sdsyncKey.CreateSubKey("PlugIn");
-                                        pluginKey.SetValue("FileName", Path.Combine(installPath, "plugins", "Rhino", "SDPluginForRhino.rhp"));
+                                        pluginKey.SetValue("FileName", Path.Combine(installPath, "plugins", "Rhino", subKey.Substring(0, 1), "SDPluginForRhino.rhp"));
                                     }
                                 }
                             }
